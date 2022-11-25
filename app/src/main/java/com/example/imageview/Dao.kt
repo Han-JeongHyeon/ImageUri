@@ -7,6 +7,7 @@ import androidx.room.Query
 
 @Dao
 interface Dao {
+
     @Query("SELECT * FROM image")
     fun getAll(): List<Image>
 

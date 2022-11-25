@@ -8,5 +8,5 @@ import java.net.URL
 
 @Entity
 data class Image(
-    @PrimaryKey val imageUri: String
+    @PrimaryKey val imageName: String
 )

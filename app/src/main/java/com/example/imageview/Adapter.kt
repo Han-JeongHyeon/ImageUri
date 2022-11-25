@@ -31,8 +31,7 @@ class Adapter (
 
     override fun onBindViewHolder(holder: AdapterViewHolder, position: Int) {
         val item = models[position]
-        Log.d("TAG", "$position ${item.imageUri}")
-        holder.image.setImageURI(item.imageUri)
+        holder.image.setImageBitmap(item.imageBitmap)
     }
 
     inner class AdapterViewHolder(view: View) : RecyclerView.ViewHolder(view) {
