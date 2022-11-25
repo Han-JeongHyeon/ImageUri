@@ -24,7 +24,7 @@ import kotlin.concurrent.timer
 class MainViewModel(private val context: Context, private val imageDao: Dao) : ViewModel() {
 
     val uriList: ArrayList<ImageData> = arrayListOf()
-    val imgNameList: ArrayList<String> = arrayListOf()
+    val imgNameList: ArrayList<Image> = arrayListOf()
 
     fun setDB() = viewModelScope.launch(Dispatchers.IO) {
         imageDao.getAll()
@@ -48,14 +48,14 @@ class MainViewModel(private val context: Context, private val imageDao: Dao) : V
 
         viewModelScope.launch(Dispatchers.IO) {
             imageDao.getAll().map {
-                imgNameList.add(it.imageName)
+                imgNameList.add(Image(it.id,it.imageName))
             }
 
-            imageDao.delete(Image(imgNameList[position]))
+            imageDao.delete(imgNameList[position])
 
             val flies = context.cacheDir.listFiles()
             for (i in flies!!.indices) {
-                if (flies[i].name == imgNameList[position]) {
+                if (flies[i].name == imgNameList[position].id) {
                     flies[i].delete()
                 }
             }
@@ -64,12 +64,12 @@ class MainViewModel(private val context: Context, private val imageDao: Dao) : V
         return uriList
     }
 
-    fun insert(Uri: String) = viewModelScope.launch(Dispatchers.IO) {
-        imageDao.insertAll(Image(Uri))
+    fun insert(id: String, Uri: String) = viewModelScope.launch(Dispatchers.IO) {
+        imageDao.insertAll(Image(id, Uri))
     }
 
     fun saveBitmap(bitmap: Bitmap, imgName: String) {
-        val tempFile = File(context.cacheDir, "$imgName.png")
+        val tempFile = File(context.cacheDir, "$bitmap.png")
 
         val flies = context.cacheDir.listFiles()
         for (i in flies!!.indices) {
@@ -82,7 +82,7 @@ class MainViewModel(private val context: Context, private val imageDao: Dao) : V
         bitmap.compress(Bitmap.CompressFormat.PNG, 100, out)
         out.close()
 
-        insert(tempFile.toURI().toString())
+        insert(tempFile.name, tempFile.toURI().toString())
     }
 
     fun getActivityResult(data: Intent?): ArrayList<ImageData> {

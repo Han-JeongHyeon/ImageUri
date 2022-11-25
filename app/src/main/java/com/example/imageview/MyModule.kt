@@ -10,7 +10,7 @@ import org.koin.dsl.module
 var appModule = module {
 
     fun imageDatabase(application: Application): AppDatabase {
-        return Room.databaseBuilder(application, AppDatabase::class.java, "imageDB3")
+        return Room.databaseBuilder(application, AppDatabase::class.java, "imageDB")
             .fallbackToDestructiveMigration()
             .build()
     }
