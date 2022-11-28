@@ -1,6 +1,7 @@
 package com.example.imageview
 
 import android.annotation.SuppressLint
+import android.app.Application
 import android.content.Context
 import android.content.Intent
 import android.graphics.Bitmap
@@ -13,67 +14,61 @@ import android.widget.Button
 import android.widget.Toast
 import androidx.lifecycle.*
 import androidx.room.Room
+import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.*
 import java.io.File
 import java.io.FileOutputStream
-import java.text.ParseException
-import java.text.SimpleDateFormat
 import java.util.ArrayList
-import kotlin.concurrent.timer
+import javax.inject.Inject
 
-class MainViewModel(private val context: Context, private val imageDao: Dao) : ViewModel() {
+@HiltViewModel
+class MainViewModel @Inject constructor(private val imageDao: Dao, application: Application) : AndroidViewModel(application) {
+    private val context = getApplication<Application>().applicationContext
 
-    val uriList: ArrayList<ImageData> = arrayListOf()
-    val imgNameList: ArrayList<Image> = arrayListOf()
+    private val uriList: ArrayList<ImageData> = arrayListOf()
+    private val imgNameList: ArrayList<Image> = arrayListOf()
 
-    fun setDB() = viewModelScope.launch(Dispatchers.IO) {
-        imageDao.getAll()
-    }
-
-    fun select(): ArrayList<ImageData> {
-        viewModelScope.launch(Dispatchers.IO) {
-            imageDao.getAll().map {
-                val bitmap: Bitmap = BitmapFactory.decodeFile(it.imageName.substring(5))
-                uriList.add(ImageData(bitmap))
-            }
+    suspend fun select() = viewModelScope.async(Dispatchers.IO) {
+        imageDao.getAll().map {
+            val bitmap: Bitmap = BitmapFactory.decodeFile(it.imageName.substring(5))
+            uriList.add(ImageData(bitmap))
         }
 
-        return uriList
-    }
+        return@async uriList
+    }.await()
 
-    fun delete(context: Context, position: Int): ArrayList<ImageData> {
-        uriList.removeAt(position)
+    suspend fun delete(position: Int): ArrayList<ImageData> {
+        try {
+            uriList.removeAt(position)
 
-        imgNameList.clear()
+            imgNameList.clear()
 
-        viewModelScope.launch(Dispatchers.IO) {
-            imageDao.getAll().map {
-                imgNameList.add(Image(it.id,it.imageName))
-            }
-
-            imageDao.delete(imgNameList[position])
-
-            val flies = context.cacheDir.listFiles()
-            for (i in flies!!.indices) {
-                if (flies[i].name == imgNameList[position].id) {
-                    flies[i].delete()
+            viewModelScope.async(Dispatchers.IO) {
+                imageDao.getAll().map {
+                    imgNameList.add(Image(it.id,it.imageName))
                 }
-            }
-        }
+
+                imageDao.delete(imgNameList[position])
+
+                val flies = context.cacheDir.listFiles()
+                for (i in flies!!.indices) {
+                    if (flies[i].name == imgNameList[position].id) {
+                        flies[i].delete()
+                    }
+                }
+            }.await()
+        } catch (e: Exception) { }
 
         return uriList
     }
 
-    fun insert(id: String, Uri: String) = viewModelScope.launch(Dispatchers.IO) {
-        imageDao.insertAll(Image(id, Uri))
-    }
-
-    fun saveBitmap(bitmap: Bitmap, imgName: String) {
+    private fun saveBitmap(bitmap: Bitmap) {
         val tempFile = File(context.cacheDir, "$bitmap.png")
 
         val flies = context.cacheDir.listFiles()
         for (i in flies!!.indices) {
-            if (flies[i].name == "$imgName.png") {
+            if (flies[i].name == "$bitmap.png") {
                 flies[i].delete()
             }
         }
@@ -82,7 +77,9 @@ class MainViewModel(private val context: Context, private val imageDao: Dao) : V
         bitmap.compress(Bitmap.CompressFormat.PNG, 100, out)
         out.close()
 
-        insert(tempFile.name, tempFile.toURI().toString())
+        viewModelScope.launch(Dispatchers.IO) {
+            imageDao.insertAll(Image(tempFile.name, tempFile.toURI().toString()))
+        }
     }
 
     fun getActivityResult(data: Intent?): ArrayList<ImageData> {
@@ -109,9 +106,8 @@ class MainViewModel(private val context: Context, private val imageDao: Dao) : V
 
                     val inputStream = resolver.openInputStream(imageUri)
                     val imgBitmap = BitmapFactory.decodeStream(inputStream)
-                    val imgName = imgBitmap.toString().substring(imgBitmap.toString().indexOf("@")+1)
 
-                    saveBitmap(imgBitmap, imgName)
+                    saveBitmap(imgBitmap)
 
                     inputStream!!.close()
                     uriList.add(ImageData(imgBitmap))

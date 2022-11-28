@@ -9,18 +9,21 @@ import android.os.Bundle
 import android.provider.MediaStore
 import android.util.Log
 import android.widget.Toast
+import androidx.activity.viewModels
 import androidx.appcompat.app.AppCompatActivity
+import androidx.lifecycle.lifecycleScope
 import androidx.viewpager2.widget.ViewPager2
 import com.example.imageview.databinding.ActivityMainBinding
+import dagger.hilt.android.AndroidEntryPoint
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import org.koin.android.ext.android.inject
 
-
-class MainActivity() : AppCompatActivity() {
-
+@AndroidEntryPoint
+class MainActivity : AppCompatActivity() {
     private val binding by lazy { ActivityMainBinding.inflate(layoutInflater) }
-
-    val viewModel: MainViewModel by inject()
+    private val viewModel: MainViewModel by viewModels()
 
     var viewPagerPosition = 0
 
@@ -28,19 +31,19 @@ class MainActivity() : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(binding.root)
 
-        viewModel.setDB()
-
-        binding.viewPager2.adapter = Adapter(viewModel.select(), baseContext)
+        lifecycleScope.launch(Dispatchers.Main) {
+            binding.viewPager2.adapter = Adapter(viewModel.select(), this@MainActivity)
+        }
 
         binding.loadBtn.setOnClickListener {
             navigatePhotos()
         }
 
         binding.deleteBtn.setOnClickListener {
-            try {
-                val uri = viewModel.delete(baseContext, viewPagerPosition)
-                binding.viewPager2.adapter = Adapter(uri, baseContext)
-            } catch (e: Exception) { }
+            lifecycleScope.launch(Dispatchers.Main) {
+                binding.viewPager2.adapter =
+                    Adapter(viewModel.delete(viewPagerPosition), this@MainActivity)
+            }
         }
 
         binding.viewPager2.registerOnPageChangeCallback(object : ViewPager2.OnPageChangeCallback() {
@@ -64,7 +67,6 @@ class MainActivity() : AppCompatActivity() {
         super.onActivityResult(requestCode, resultCode, data)
 
         binding.viewPager2.adapter = Adapter(viewModel.getActivityResult(data), baseContext)
-
     }
 
 }
